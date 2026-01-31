@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go get:*)",
+      "Bash(go build:*)",
+      "Bash(./lcmigrate.exe:*)",
+      "Bash(go doc:*)",
+      "Bash(go mod tidy:*)"
+    ]
+  }
+}
