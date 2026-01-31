@@ -8,7 +8,8 @@
       "Bash(go mod tidy:*)",
       "Bash(go vet:*)",
       "Bash(go test:*)",
-      "Bash(go run:*)"
+      "Bash(go run:*)",
+      "Bash(go tool cover:*)"
     ]
   }
 }
