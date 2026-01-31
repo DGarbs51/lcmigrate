@@ -28,7 +28,7 @@ var analyzeCmd = &cobra.Command{
 		}
 		defer conn.Close()
 
-		fmt.Println("\n=== Database Analysis ===\n")
+		fmt.Println("\n=== Database Analysis ===")
 
 		if err := db.Analyze(conn, config); err != nil {
 			fmt.Printf("Error analyzing database: %v\n", err)
