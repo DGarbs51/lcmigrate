@@ -6,7 +6,9 @@
       "Bash(./lcmigrate.exe:*)",
       "Bash(go doc:*)",
       "Bash(go mod tidy:*)",
-      "Bash(go vet:*)"
+      "Bash(go vet:*)",
+      "Bash(go test:*)",
+      "Bash(go run:*)"
     ]
   }
 }

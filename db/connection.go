@@ -149,45 +149,73 @@ func PromptConnectionDetails() Config {
 }
 
 func Connect(config Config) (*sql.DB, error) {
-	var dsn string
-	var driverName string
-
 	bold := color.New(color.Bold).SprintFunc()
 	green := color.New(color.FgGreen).SprintFunc()
 	red := color.New(color.FgRed).SprintFunc()
 
+	var db *sql.DB
+	var sslMode string
+	var lastErr error
+
 	switch config.Engine {
 	case "mysql":
-		driverName = "mysql"
-		dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s",
+		dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s",
 			config.User, config.Password, config.Host, config.Port, config.Database)
+		var err error
+		db, err = sql.Open("mysql", dsn)
+		if err != nil {
+			fmt.Printf("  %s %s\n", red("✗"), err)
+			return nil, err
+		}
+		if err := db.Ping(); err != nil {
+			fmt.Printf("  %s %s\n", red("✗"), err)
+			return nil, err
+		}
+
 	case "pgsql":
-		driverName = "postgres" // lib/pq uses "postgres" as driver name
-		dsn = fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=require",
-			url.QueryEscape(config.User), url.QueryEscape(config.Password),
-			config.Host, config.Port, config.Database)
+		// Try SSL modes in order: require -> prefer -> disable
+		sslModes := []string{"require", "prefer", "disable"}
+		for _, mode := range sslModes {
+			dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
+				url.QueryEscape(config.User), url.QueryEscape(config.Password),
+				config.Host, config.Port, config.Database, mode)
+
+			var err error
+			db, err = sql.Open("postgres", dsn)
+			if err != nil {
+				lastErr = err
+				continue
+			}
+			if err := db.Ping(); err != nil {
+				db.Close()
+				lastErr = err
+				continue
+			}
+			sslMode = mode
+			break
+		}
+		if db == nil || sslMode == "" {
+			fmt.Printf("  %s %s\n", red("✗"), lastErr)
+			return nil, fmt.Errorf("failed to connect with any SSL mode: %w", lastErr)
+		}
+
 	default:
 		return nil, fmt.Errorf("unsupported database engine: %s", config.Engine)
 	}
 
-	db, err := sql.Open(driverName, dsn)
-	if err != nil {
-		fmt.Printf("  %s %s\n", red("✗"), err)
-		return nil, err
+	// Show connection info
+	sslInfo := ""
+	if sslMode != "" && sslMode != "require" {
+		sslInfo = fmt.Sprintf(" (SSL: %s)", sslMode)
 	}
-
-	if err := db.Ping(); err != nil {
-		fmt.Printf("  %s %s\n", red("✗"), err)
-		return nil, err
-	}
-
-	fmt.Printf("  %s %s %s @ %s:%s/%s\n",
+	fmt.Printf("  %s %s %s @ %s:%s/%s%s\n",
 		green("✓"),
 		bold("Connected to"),
 		config.Engine,
 		config.Host,
 		config.Port,
 		config.Database,
+		sslInfo,
 	)
 
 	return db, nil
