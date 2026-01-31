@@ -1,5 +1,7 @@
 # Laravel Cloud Migrate
 
+[![Tests](https://github.com/DGarbs51/lcmigrate/actions/workflows/test.yml/badge.svg)](https://github.com/DGarbs51/lcmigrate/actions/workflows/test.yml)
+
 CLI tool for migrating MySQL and PostgreSQL databases to Laravel Cloud.
 
 ## Installation
