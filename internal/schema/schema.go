@@ -2,6 +2,9 @@ package schema
 
 import (
 	"database/sql"
+	"fmt"
+
+	"github.com/DGarbs51/lcmigrate/internal/dialect"
 )
 
 // TableSchema represents the schema of a database table
@@ -25,28 +28,28 @@ type ColumnDef struct {
 
 // IndexDef represents an index definition
 type IndexDef struct {
-	Name      string
-	Columns   []string
-	IsUnique  bool
-	IsPrimary bool
+	Name       string
+	Columns    []string
+	IsUnique   bool
+	IsPrimary  bool
 	CreateStmt string // Full CREATE INDEX statement
 }
 
 // ForeignKeyDef represents a foreign key constraint
 type ForeignKeyDef struct {
-	Name             string
-	Columns          []string
-	RefTable         string
-	RefColumns       []string
-	OnDelete         string
-	OnUpdate         string
-	ConstraintStmt   string // Full ALTER TABLE ADD CONSTRAINT statement
+	Name           string
+	Columns        []string
+	RefTable       string
+	RefColumns     []string
+	OnDelete       string
+	OnUpdate       string
+	ConstraintStmt string // Full ALTER TABLE ADD CONSTRAINT statement
 }
 
 // ViewDef represents a view definition
 type ViewDef struct {
-	Name       string
-	CreateStmt string
+	Name         string
+	CreateStmt   string
 	Dependencies []string // Other views this view depends on
 }
 
@@ -79,9 +82,9 @@ type Applier interface {
 func NewExtractor(engine string) Extractor {
 	switch engine {
 	case "mysql":
-		return &MySQLExtractor{}
+		return NewMySQLExtractor()
 	case "pgsql":
-		return &PostgresExtractor{}
+		return NewPostgresExtractor()
 	default:
 		return nil
 	}
@@ -91,10 +94,42 @@ func NewExtractor(engine string) Extractor {
 func NewApplier(engine string) Applier {
 	switch engine {
 	case "mysql":
-		return &MySQLApplier{}
+		return NewMySQLApplier()
 	case "pgsql":
-		return &PostgresApplier{}
+		return NewPostgresApplier()
 	default:
 		return nil
 	}
+}
+
+// BaseApplier contains shared schema application logic
+type BaseApplier struct {
+	Dialect dialect.Dialect
+}
+
+// CreateIndex creates an index on a table
+func (a *BaseApplier) CreateIndex(db *sql.DB, index IndexDef) error {
+	_, err := db.Exec(index.CreateStmt)
+	if err != nil {
+		return fmt.Errorf("failed to create index %s: %w", index.Name, err)
+	}
+	return nil
+}
+
+// CreateForeignKey adds a foreign key constraint to a table
+func (a *BaseApplier) CreateForeignKey(db *sql.DB, fk ForeignKeyDef) error {
+	_, err := db.Exec(fk.ConstraintStmt)
+	if err != nil {
+		return fmt.Errorf("failed to create foreign key %s: %w", fk.Name, err)
+	}
+	return nil
+}
+
+// CreateView creates a view in the database
+func (a *BaseApplier) CreateView(db *sql.DB, view ViewDef) error {
+	_, err := db.Exec(view.CreateStmt)
+	if err != nil {
+		return fmt.Errorf("failed to create view %s: %w", view.Name, err)
+	}
+	return nil
 }

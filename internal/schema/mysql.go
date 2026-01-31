@@ -5,10 +5,21 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/DGarbs51/lcmigrate/internal/dialect"
 )
 
 // MySQLExtractor extracts schema from MySQL databases
-type MySQLExtractor struct{}
+type MySQLExtractor struct {
+	Dialect dialect.Dialect
+}
+
+// NewMySQLExtractor creates a new MySQL schema extractor
+func NewMySQLExtractor() *MySQLExtractor {
+	return &MySQLExtractor{
+		Dialect: &dialect.MySQLDialect{},
+	}
+}
 
 // ExtractTables extracts all table schemas from the database
 func (e *MySQLExtractor) ExtractTables(db *sql.DB, database string) ([]TableSchema, error) {
@@ -200,9 +211,21 @@ func (e *MySQLExtractor) ExtractSequences(db *sql.DB, database string) ([]Sequen
 }
 
 // MySQLApplier applies schema to MySQL databases
-type MySQLApplier struct{}
+type MySQLApplier struct {
+	BaseApplier
+}
+
+// NewMySQLApplier creates a new MySQL schema applier
+func NewMySQLApplier() *MySQLApplier {
+	return &MySQLApplier{
+		BaseApplier: BaseApplier{
+			Dialect: &dialect.MySQLDialect{},
+		},
+	}
+}
 
 // CreateTable creates a table in the database
+// MySQL-specific: removes foreign key constraints from CREATE TABLE statement
 func (a *MySQLApplier) CreateTable(db *sql.DB, table TableSchema) error {
 	// Remove foreign key constraints from CREATE TABLE statement
 	// We'll add them later after all tables are created
@@ -215,34 +238,7 @@ func (a *MySQLApplier) CreateTable(db *sql.DB, table TableSchema) error {
 	return nil
 }
 
-// CreateIndex creates an index on a table
-func (a *MySQLApplier) CreateIndex(db *sql.DB, index IndexDef) error {
-	_, err := db.Exec(index.CreateStmt)
-	if err != nil {
-		return fmt.Errorf("failed to create index %s: %w", index.Name, err)
-	}
-	return nil
-}
-
-// CreateForeignKey adds a foreign key constraint to a table
-func (a *MySQLApplier) CreateForeignKey(db *sql.DB, fk ForeignKeyDef) error {
-	_, err := db.Exec(fk.ConstraintStmt)
-	if err != nil {
-		return fmt.Errorf("failed to create foreign key %s: %w", fk.Name, err)
-	}
-	return nil
-}
-
-// CreateView creates a view in the database
-func (a *MySQLApplier) CreateView(db *sql.DB, view ViewDef) error {
-	_, err := db.Exec(view.CreateStmt)
-	if err != nil {
-		return fmt.Errorf("failed to create view %s: %w", view.Name, err)
-	}
-	return nil
-}
-
-// CreateSequence is a no-op for MySQL
+// CreateSequence is a no-op for MySQL (uses AUTO_INCREMENT instead)
 func (a *MySQLApplier) CreateSequence(db *sql.DB, seq SequenceDef) error {
 	return nil
 }

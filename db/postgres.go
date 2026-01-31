@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/DGarbs51/lcmigrate/internal/format"
 	"github.com/fatih/color"
 )
 
@@ -25,7 +26,7 @@ func AnalyzePostgres(db *sql.DB, database string) error {
 	if err := db.QueryRow(`SELECT version()`).Scan(&version); err != nil {
 		return fmt.Errorf("failed to get version: %w", err)
 	}
-	fmt.Printf("  %-22s %s\n", cyan("Version:"), green(truncate(version, 60)))
+	fmt.Printf("  %-22s %s\n", cyan("Version:"), green(format.Truncate(version, 60)))
 
 	var maxConns string
 	if err := db.QueryRow(`SHOW max_connections`).Scan(&maxConns); err == nil {
@@ -55,7 +56,7 @@ func AnalyzePostgres(db *sql.DB, database string) error {
 	// Uptime
 	var uptime float64
 	if err := db.QueryRow(`SELECT EXTRACT(EPOCH FROM (now() - pg_postmaster_start_time()))`).Scan(&uptime); err == nil {
-		fmt.Printf("  %-22s %s\n", cyan("Uptime:"), formatDuration(int64(uptime)))
+		fmt.Printf("  %-22s %s\n", cyan("Uptime:"), format.Duration(int64(uptime)))
 	}
 
 	// Table count
@@ -81,7 +82,7 @@ func AnalyzePostgres(db *sql.DB, database string) error {
 	fmt.Printf("  %s\n", bold("📊 Database Summary"))
 	fmt.Printf("  %s\n\n", dim("─────────────────────────────"))
 	fmt.Printf("  %s  %s\n", cyan("Tables:"), green(strconv.Itoa(tableCount)))
-	fmt.Printf("  %s    %s\n", cyan("Size:"), green(formatBytes(float64(dbSize))))
+	fmt.Printf("  %s    %s\n", cyan("Size:"), green(format.Bytes(float64(dbSize))))
 
 	// Table details
 	fmt.Println()
@@ -113,9 +114,9 @@ func AnalyzePostgres(db *sql.DB, database string) error {
 			return err
 		}
 		totalRows += rowCount
-		fmt.Printf("  %-35s %12s %12s\n", truncate(tableName, 35), formatNumber(rowCount), formatBytes(float64(totalSize)))
+		fmt.Printf("  %-35s %12s %12s\n", format.Truncate(tableName, 35), format.Number(rowCount), format.Bytes(float64(totalSize)))
 	}
-	fmt.Printf("\n  %s %s\n", yellow("Total Rows:"), green(formatNumber(totalRows)))
+	fmt.Printf("\n  %s %s\n", yellow("Total Rows:"), green(format.Number(totalRows)))
 
 	// Index information
 	fmt.Println()
@@ -148,7 +149,7 @@ func AnalyzePostgres(db *sql.DB, database string) error {
 		if isUnique {
 			unique = green("Yes")
 		}
-		fmt.Printf("  %-30s %-40s %s\n", truncate(tableName, 30), truncate(indexName, 40), unique)
+		fmt.Printf("  %-30s %-40s %s\n", format.Truncate(tableName, 30), format.Truncate(indexName, 40), unique)
 	}
 
 	// Foreign keys
@@ -188,8 +189,8 @@ func AnalyzePostgres(db *sql.DB, database string) error {
 		if err := fkRows.Scan(&tableName, &columnName, &constraintName, &refTable, &refColumn); err != nil {
 			return err
 		}
-		tableCol := truncate(tableName+"."+columnName, 30)
-		fmt.Printf("  %-30s %-35s %-20s %s\n", tableCol, truncate(constraintName, 35), truncate(refTable, 20), refColumn)
+		tableCol := format.Truncate(tableName+"."+columnName, 30)
+		fmt.Printf("  %-30s %-35s %-20s %s\n", tableCol, format.Truncate(constraintName, 35), format.Truncate(refTable, 20), refColumn)
 	}
 	if !hasFKs {
 		fmt.Printf("  %s\n", dim("No foreign keys found"))

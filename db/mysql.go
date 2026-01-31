@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/DGarbs51/lcmigrate/internal/format"
 	"github.com/fatih/color"
 )
 
@@ -54,7 +55,7 @@ func AnalyzeMySQL(db *sql.DB, database string) error {
 		case "innodb_buffer_pool_size":
 			displayName = "InnoDB Buffer Pool"
 			if size, err := strconv.ParseInt(value, 10, 64); err == nil {
-				value = formatBytes(float64(size))
+				value = format.Bytes(float64(size))
 			}
 		}
 		fmt.Printf("  %-22s %s\n", cyan(displayName+":"), value)
@@ -63,7 +64,7 @@ func AnalyzeMySQL(db *sql.DB, database string) error {
 	// Uptime
 	var uptime int64
 	if err := db.QueryRow(`SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'Uptime'`).Scan(&uptime); err == nil {
-		fmt.Printf("  %-22s %s\n", cyan("Uptime:"), formatDuration(uptime))
+		fmt.Printf("  %-22s %s\n", cyan("Uptime:"), format.Duration(uptime))
 	}
 
 	// Table count
@@ -94,7 +95,7 @@ func AnalyzeMySQL(db *sql.DB, database string) error {
 	fmt.Printf("  %s\n\n", dim("─────────────────────────────"))
 	fmt.Printf("  %s  %s\n", cyan("Tables:"), green(strconv.Itoa(tableCount)))
 	if dbSize.Valid {
-		fmt.Printf("  %s    %s\n", cyan("Size:"), green(formatBytes(dbSize.Float64)))
+		fmt.Printf("  %s    %s\n", cyan("Size:"), green(format.Bytes(dbSize.Float64)))
 	} else {
 		fmt.Printf("  %s    %s\n", cyan("Size:"), "0 bytes")
 	}
@@ -138,9 +139,9 @@ func AnalyzeMySQL(db *sql.DB, database string) error {
 		if totalSize.Valid {
 			size = totalSize.Float64
 		}
-		fmt.Printf("  %-35s %-12s %12s %12s\n", tableName, engine, formatNumber(rowCount), formatBytes(size))
+		fmt.Printf("  %-35s %-12s %12s %12s\n", tableName, engine, format.Number(rowCount), format.Bytes(size))
 	}
-	fmt.Printf("\n  %s %s\n", yellow("Total Estimated Rows:"), green(formatNumber(totalRows)))
+	fmt.Printf("\n  %s %s\n", yellow("Total Estimated Rows:"), green(format.Number(totalRows)))
 
 	// Index information
 	fmt.Println()
@@ -175,7 +176,7 @@ func AnalyzeMySQL(db *sql.DB, database string) error {
 		if nonUnique == 1 {
 			unique = "No"
 		}
-		fmt.Printf("  %-25s %-30s %-30s %s\n", truncate(tableName, 25), truncate(indexName, 30), truncate(columns, 30), unique)
+		fmt.Printf("  %-25s %-30s %-30s %s\n", format.Truncate(tableName, 25), format.Truncate(indexName, 30), format.Truncate(columns, 30), unique)
 	}
 
 	// Foreign keys
@@ -209,8 +210,8 @@ func AnalyzeMySQL(db *sql.DB, database string) error {
 		if err := fkRows.Scan(&tableName, &columnName, &constraintName, &refTable, &refColumn); err != nil {
 			return err
 		}
-		tableCol := truncate(tableName+"."+columnName, 30)
-		fmt.Printf("  %-30s %-35s %-20s %s\n", tableCol, truncate(constraintName, 35), truncate(refTable, 20), refColumn)
+		tableCol := format.Truncate(tableName+"."+columnName, 30)
+		fmt.Printf("  %-30s %-35s %-20s %s\n", tableCol, format.Truncate(constraintName, 35), format.Truncate(refTable, 20), refColumn)
 	}
 	if !hasFKs {
 		fmt.Printf("  %s\n", dim("No foreign keys found"))
@@ -236,57 +237,4 @@ func AnalyzeMySQL(db *sql.DB, database string) error {
 
 	fmt.Println()
 	return nil
-}
-
-func formatBytes(bytes float64) string {
-	const unit = 1024
-	if bytes < unit {
-		return fmt.Sprintf("%.0f B", bytes)
-	}
-	div, exp := float64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.2f %cB", bytes/div, "KMGTPE"[exp])
-}
-
-func formatNumber(n int64) string {
-	if n < 1000 {
-		return strconv.FormatInt(n, 10)
-	}
-
-	s := strconv.FormatInt(n, 10)
-	result := ""
-	for i, c := range s {
-		if i > 0 && (len(s)-i)%3 == 0 {
-			result += ","
-		}
-		result += string(c)
-	}
-	return result
-}
-
-func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	if maxLen <= 3 {
-		return s[:maxLen]
-	}
-	return s[:maxLen-3] + "..."
-}
-
-func formatDuration(seconds int64) string {
-	days := seconds / 86400
-	hours := (seconds % 86400) / 3600
-	minutes := (seconds % 3600) / 60
-
-	if days > 0 {
-		return fmt.Sprintf("%dd %dh %dm", days, hours, minutes)
-	}
-	if hours > 0 {
-		return fmt.Sprintf("%dh %dm", hours, minutes)
-	}
-	return fmt.Sprintf("%dm", minutes)
 }

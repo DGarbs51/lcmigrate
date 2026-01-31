@@ -5,10 +5,21 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/DGarbs51/lcmigrate/internal/dialect"
 )
 
 // PostgresExtractor extracts schema from PostgreSQL databases
-type PostgresExtractor struct{}
+type PostgresExtractor struct {
+	Dialect dialect.Dialect
+}
+
+// NewPostgresExtractor creates a new PostgreSQL schema extractor
+func NewPostgresExtractor() *PostgresExtractor {
+	return &PostgresExtractor{
+		Dialect: &dialect.PostgresDialect{},
+	}
+}
 
 // ExtractTables extracts all table schemas from the database
 func (e *PostgresExtractor) ExtractTables(db *sql.DB, database string) ([]TableSchema, error) {
@@ -307,7 +318,18 @@ func (e *PostgresExtractor) ExtractSequences(db *sql.DB, database string) ([]Seq
 }
 
 // PostgresApplier applies schema to PostgreSQL databases
-type PostgresApplier struct{}
+type PostgresApplier struct {
+	BaseApplier
+}
+
+// NewPostgresApplier creates a new PostgreSQL schema applier
+func NewPostgresApplier() *PostgresApplier {
+	return &PostgresApplier{
+		BaseApplier: BaseApplier{
+			Dialect: &dialect.PostgresDialect{},
+		},
+	}
+}
 
 // CreateTable creates a table in the database
 func (a *PostgresApplier) CreateTable(db *sql.DB, table TableSchema) error {
@@ -318,34 +340,8 @@ func (a *PostgresApplier) CreateTable(db *sql.DB, table TableSchema) error {
 	return nil
 }
 
-// CreateIndex creates an index on a table
-func (a *PostgresApplier) CreateIndex(db *sql.DB, index IndexDef) error {
-	_, err := db.Exec(index.CreateStmt)
-	if err != nil {
-		return fmt.Errorf("failed to create index %s: %w", index.Name, err)
-	}
-	return nil
-}
-
-// CreateForeignKey adds a foreign key constraint
-func (a *PostgresApplier) CreateForeignKey(db *sql.DB, fk ForeignKeyDef) error {
-	_, err := db.Exec(fk.ConstraintStmt)
-	if err != nil {
-		return fmt.Errorf("failed to create foreign key %s: %w", fk.Name, err)
-	}
-	return nil
-}
-
-// CreateView creates a view
-func (a *PostgresApplier) CreateView(db *sql.DB, view ViewDef) error {
-	_, err := db.Exec(view.CreateStmt)
-	if err != nil {
-		return fmt.Errorf("failed to create view %s: %w", view.Name, err)
-	}
-	return nil
-}
-
 // CreateSequence creates a sequence
+// PostgreSQL-specific: handles SERIAL auto-creation gracefully
 func (a *PostgresApplier) CreateSequence(db *sql.DB, seq SequenceDef) error {
 	// Sequences are typically created automatically with SERIAL/BIGSERIAL columns
 	// This handles standalone sequences
@@ -362,7 +358,7 @@ func (a *PostgresApplier) CreateSequence(db *sql.DB, seq SequenceDef) error {
 // SetSequenceValue sets the current value of a sequence
 func (a *PostgresApplier) SetSequenceValue(db *sql.DB, seq SequenceDef) error {
 	_, err := db.Exec(fmt.Sprintf("SELECT setval(%s, $1, true)",
-		quoteLiteral(seq.Name)), seq.CurrentVal)
+		a.Dialect.QuoteLiteral(seq.Name)), seq.CurrentVal)
 	if err != nil {
 		return fmt.Errorf("failed to set sequence value for %s: %w", seq.Name, err)
 	}
